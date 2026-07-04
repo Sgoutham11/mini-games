@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  game-server:
+    # build:
+    #   context: ..
+    #   dockerfile: docker/game-server/Dockerfile
+    image: sos-game-server:v1
+    ports:
+      - "3001:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    # build:
+    #   context: ..
+    #   dockerfile: docker/frontend/Dockerfile
+    image: sos-frontend:v1
+    ports:
+      - "5173:80"
+    depends_on:
+      - game-server
+    restart: unless-stopped
+
+volumes:
+  redis_data:

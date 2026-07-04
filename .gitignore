@@ -1,17 +1,9 @@
-# Dependencies
-node_modules/
-
-# Build output
+﻿node_modules/
+**/node_modules/
 dist/
-build/
-
-# Environment
-.env
-.env.*
-
-# Logs
-*.log
-
-# Large files
+**/dist/
 *.tar
 *.zip
+.env
+.env.*
+*.log
