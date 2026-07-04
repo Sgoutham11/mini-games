@@ -1,0 +1,145 @@
+name: Deploy Mini Game
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'sos-game/**'
+      - '.github/workflows/deploy-mini-game.yml'
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      game_server: ${{ steps.filter.outputs.game_server }}
+      shared_or_common: ${{ steps.filter.outputs.shared_or_common }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'sos-game/frontend/**'
+            game_server:
+              - 'sos-game/game-server/**'
+            shared_or_common:
+              - 'sos-game/shared/**'
+              - 'sos-game/docker/**'
+              - 'sos-game/docker-compose.yml'
+
+  deploy:
+    needs: changes
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: sos-game
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build frontend image
+        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared_or_common == 'true'
+        run: |
+          docker build \
+            -f docker/frontend/Dockerfile \
+            --build-arg VITE_API_URL="${{ vars.VITE_API_URL }}" \
+            --build-arg VITE_SOCKET_URL="${{ vars.VITE_SOCKET_URL }}" \
+            --build-arg LOGGER_URL="${{ vars.LOGGER_URL }}" \
+            -t sos-frontend:v1 .
+
+      - name: Build game-server image
+        if: needs.changes.outputs.game_server == 'true' || needs.changes.outputs.shared_or_common == 'true'
+        run: |
+          docker build \
+            -f docker/game-server/Dockerfile \
+            --build-arg NODE_ENV="${{ vars.NODE_ENV }}" \
+            --build-arg PORT="${{ vars.PORT }}" \
+            --build-arg REDIS_URL="${{ vars.REDIS_URL }}" \
+            --build-arg SPRING_BOOT_URL="${{ vars.SPRING_BOOT_URL }}" \
+            --build-arg LOGGER_URL="${{ vars.LOGGER_URL }}" \
+            --build-arg CORS_ORIGINS="${{ vars.CORS_ORIGINS }}" \
+            -t sos-game-server:v1 .
+
+      - name: Save frontend image
+        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared_or_common == 'true'
+        run: docker save sos-frontend:v1 -o sos-frontend.tar
+
+      - name: Save game-server image
+        if: needs.changes.outputs.game_server == 'true' || needs.changes.outputs.shared_or_common == 'true'
+        run: docker save sos-game-server:v1 -o sos-game-server.tar
+
+      - name: Copy frontend image
+        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared_or_common == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ vars.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "sos-game/sos-frontend.tar"
+          target: "~/sos"
+          strip_components: 1
+
+      - name: Copy game-server image
+        if: needs.changes.outputs.game_server == 'true' || needs.changes.outputs.shared_or_common == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ vars.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "sos-game/sos-game-server.tar"
+          target: "~/sos"
+          strip_components: 1
+
+      - name: Copy docker-compose
+        if: needs.changes.outputs.shared_or_common == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ vars.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "sos-game/docker-compose.yml"
+          target: "~/sos"
+          strip_components: 1
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ vars.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/sos
+
+            export NODE_ENV="${{ vars.NODE_ENV }}"
+            export PORT="${{ vars.PORT }}"
+            export TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
+            export REDIS_URL="${{ vars.REDIS_URL }}"
+            export SPRING_BOOT_URL="${{ vars.SPRING_BOOT_URL }}"
+            export LOGGER_URL="${{ vars.LOGGER_URL }}"
+            export CORS_ORIGINS="${{ vars.CORS_ORIGINS }}"
+
+            if [ "${{ needs.changes.outputs.frontend }}" = "true" ] || [ "${{ needs.changes.outputs.shared_or_common }}" = "true" ]; then
+              docker load -i sos-frontend.tar
+            fi
+
+            if [ "${{ needs.changes.outputs.game_server }}" = "true" ] || [ "${{ needs.changes.outputs.shared_or_common }}" = "true" ]; then
+              docker load -i sos-game-server.tar
+            fi
+
+            if [ "${{ needs.changes.outputs.shared_or_common }}" = "true" ]; then
+              docker compose up -d
+            elif [ "${{ needs.changes.outputs.frontend }}" = "true" ] && [ "${{ needs.changes.outputs.game_server }}" = "true" ]; then
+              docker compose up -d frontend game-server
+            elif [ "${{ needs.changes.outputs.frontend }}" = "true" ]; then
+              docker compose up -d frontend
+            elif [ "${{ needs.changes.outputs.game_server }}" = "true" ]; then
+              docker compose up -d redis game-server
+            fi
+
+            docker image prune -f
+            docker ps
