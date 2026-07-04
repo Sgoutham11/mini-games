@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+
+# Large files
+*.tar
+*.zip
