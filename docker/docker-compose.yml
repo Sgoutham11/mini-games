@@ -15,21 +15,23 @@ services:
       retries: 3
 
   game-server:
-    # build:
-    #   context: ..
-    #   dockerfile: docker/game-server/Dockerfile
     image: sos-game-server:v1
     ports:
       - "3001:3001"
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${PORT}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      REDIS_URL: ${REDIS_URL}
+      SPRING_BOOT_URL: ${SPRING_BOOT_URL}
+      LOGGER_URL: ${LOGGER_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
 
   frontend:
-    # build:
-    #   context: ..
-    #   dockerfile: docker/frontend/Dockerfile
     image: sos-frontend:v1
     ports:
       - "5173:80"
