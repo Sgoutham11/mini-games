@@ -11,19 +11,22 @@ on:
       - 'docker-compose.yml'
       - '.github/workflows/deploy-mini-game.yml'
 
+  workflow_dispatch:
+
 jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend }}
-      game_server: ${{ steps.filter.outputs.game_server }}
-      shared_or_common: ${{ steps.filter.outputs.shared_or_common }}
+      frontend: ${{ steps.set.outputs.frontend }}
+      game_server: ${{ steps.set.outputs.game_server }}
+      shared_or_common: ${{ steps.set.outputs.shared_or_common }}
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Detect changed paths
-        uses: dorny/paths-filter@v3
         id: filter
+        uses: dorny/paths-filter@v3
         with:
           filters: |
             frontend:
@@ -34,11 +37,24 @@ jobs:
               - 'shared/**'
               - 'docker/**'
               - 'docker-compose.yml'
+              - '.github/workflows/deploy-mini-game.yml'
+
+      - name: Set deploy flags
+        id: set
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "frontend=true" >> $GITHUB_OUTPUT
+            echo "game_server=true" >> $GITHUB_OUTPUT
+            echo "shared_or_common=true" >> $GITHUB_OUTPUT
+          else
+            echo "frontend=${{ steps.filter.outputs.frontend }}" >> $GITHUB_OUTPUT
+            echo "game_server=${{ steps.filter.outputs.game_server }}" >> $GITHUB_OUTPUT
+            echo "shared_or_common=${{ steps.filter.outputs.shared_or_common }}" >> $GITHUB_OUTPUT
+          fi
 
   deploy:
     needs: changes
     runs-on: ubuntu-latest
-
 
     steps:
       - uses: actions/checkout@v4
@@ -66,13 +82,18 @@ jobs:
             --build-arg CORS_ORIGINS="${{ vars.CORS_ORIGINS }}" \
             -t sos-game-server:v1 .
 
-      - name: Save frontend image
-        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared_or_common == 'true'
-        run: docker save sos-frontend:v1 -o sos-frontend.tar
+      - name: Save images
+        run: |
+          if [ "${{ needs.changes.outputs.frontend }}" = "true" ] || [ "${{ needs.changes.outputs.shared_or_common }}" = "true" ]; then
+            docker save sos-frontend:v1 -o sos-frontend.tar
+          fi
 
-      - name: Save game-server image
-        if: needs.changes.outputs.game_server == 'true' || needs.changes.outputs.shared_or_common == 'true'
-        run: docker save sos-game-server:v1 -o sos-game-server.tar
+          if [ "${{ needs.changes.outputs.game_server }}" = "true" ] || [ "${{ needs.changes.outputs.shared_or_common }}" = "true" ]; then
+            docker save sos-game-server:v1 -o sos-game-server.tar
+          fi
+
+          chmod 644 *.tar || true
+          ls -lh
 
       - name: Copy frontend image
         if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared_or_common == 'true'
@@ -83,7 +104,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "sos-frontend.tar"
           target: "~/sos"
-          strip_components: 1
+          overwrite: true
 
       - name: Copy game-server image
         if: needs.changes.outputs.game_server == 'true' || needs.changes.outputs.shared_or_common == 'true'
@@ -94,7 +115,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "sos-game-server.tar"
           target: "~/sos"
-          strip_components: 1
+          overwrite: true
 
       - name: Copy docker-compose
         if: needs.changes.outputs.shared_or_common == 'true'
@@ -105,7 +126,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "docker-compose.yml"
           target: "~/sos"
-          strip_components: 1
+          overwrite: true
 
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
@@ -133,13 +154,13 @@ jobs:
             fi
 
             if [ "${{ needs.changes.outputs.shared_or_common }}" = "true" ]; then
-              docker compose up -d
+              docker compose up -d --force-recreate
             elif [ "${{ needs.changes.outputs.frontend }}" = "true" ] && [ "${{ needs.changes.outputs.game_server }}" = "true" ]; then
-              docker compose up -d frontend game-server
+              docker compose up -d --force-recreate frontend game-server
             elif [ "${{ needs.changes.outputs.frontend }}" = "true" ]; then
-              docker compose up -d frontend
+              docker compose up -d --force-recreate frontend
             elif [ "${{ needs.changes.outputs.game_server }}" = "true" ]; then
-              docker compose up -d redis game-server
+              docker compose up -d --force-recreate redis game-server
             fi
 
             docker image prune -f
