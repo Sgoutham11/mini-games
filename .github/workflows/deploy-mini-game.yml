@@ -4,7 +4,11 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'sos-game/**'
+      - 'frontend/**'
+      - 'game-server/**'
+      - 'shared/**'
+      - 'docker/**'
+      - 'docker-compose.yml'
       - '.github/workflows/deploy-mini-game.yml'
 
 jobs:
@@ -23,21 +27,18 @@ jobs:
         with:
           filters: |
             frontend:
-              - 'sos-game/frontend/**'
+              - 'frontend/**'
             game_server:
-              - 'sos-game/game-server/**'
+              - 'game-server/**'
             shared_or_common:
-              - 'sos-game/shared/**'
-              - 'sos-game/docker/**'
-              - 'sos-game/docker-compose.yml'
+              - 'shared/**'
+              - 'docker/**'
+              - 'docker-compose.yml'
 
   deploy:
     needs: changes
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: sos-game
 
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +81,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ vars.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "sos-game/sos-frontend.tar"
+          source: "sos-frontend.tar"
           target: "~/sos"
           strip_components: 1
 
@@ -91,7 +92,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ vars.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "sos-game/sos-game-server.tar"
+          source: "sos-game-server.tar"
           target: "~/sos"
           strip_components: 1
 
@@ -102,7 +103,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ vars.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "sos-game/docker-compose.yml"
+          source: "docker-compose.yml"
           target: "~/sos"
           strip_components: 1
 
