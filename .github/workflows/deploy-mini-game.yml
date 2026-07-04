@@ -8,7 +8,7 @@ on:
       - 'game-server/**'
       - 'shared/**'
       - 'docker/**'
-      - 'docker-compose.yml'
+      - 'docker/docker-compose.yml'
       - '.github/workflows/deploy-mini-game.yml'
 
   workflow_dispatch:
@@ -36,7 +36,7 @@ jobs:
             shared_or_common:
               - 'shared/**'
               - 'docker/**'
-              - 'docker-compose.yml'
+              - 'docker/docker-compose.yml'
               - '.github/workflows/deploy-mini-game.yml'
 
       - name: Set deploy flags
@@ -124,8 +124,9 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ vars.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.yml"
+          source: "docker/docker-compose.yml"
           target: "~/sos"
+          strip_components: 1
           overwrite: true
 
       - name: Deploy on server
