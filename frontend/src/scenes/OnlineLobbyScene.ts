@@ -9,6 +9,7 @@ export class OnlineLobbyScene extends Phaser.Scene {
   private selectedCount = 2;
   private nameInput!: ReturnType<typeof NeonUI.createInput>;
   private roomCodeInput!: ReturnType<typeof NeonUI.createInput>;
+  private validationText?: Phaser.GameObjects.Text;
   private contentContainer!: Phaser.GameObjects.Container;
   private connecting = false;
   private selectedGridSize = gameData.gridSize || 3;
@@ -152,6 +153,13 @@ export class OnlineLobbyScene extends Phaser.Scene {
 
     this.roomCodeInput = NeonUI.createInput(this, width / 2, 340, width - 80, 44, 'E.G. ABCDEF', '');
     this.add.existing(this.roomCodeInput.container);
+
+    this.validationText = this.add.text(width / 2, 382, '', {
+      fontFamily: Theme.fontFamily,
+      fontSize: '12px',
+      color: '#ff4466',
+    }).setOrigin(0.5);
+    this.validationText.setResolution(window.devicePixelRatio || 2);
   }
 
   private async handleAction(): Promise<void> {
@@ -162,6 +170,12 @@ export class OnlineLobbyScene extends Phaser.Scene {
 
     try {
       await socketService.connect();
+
+      this.addSocketHandler(ServerEvents.ERROR, (payload: unknown) => {
+        const err = payload as ErrorPayload;
+        this.showValidation(err.message || 'Unable to join room');
+        this.connecting = false;
+      });
 
       if (this.mode === 'create') {
         this.addSocketHandler(ServerEvents.ROOM_CREATED, (payload: unknown) => {
@@ -185,7 +199,11 @@ export class OnlineLobbyScene extends Phaser.Scene {
         });
       } else {
         const roomCode = this.roomCodeInput.getValue().toUpperCase().trim();
-        if (!roomCode) { this.connecting = false; return; }
+        if (!roomCode) {
+          this.showValidation('Enter a room code');
+          this.connecting = false;
+          return;
+        }
 
         this.addSocketHandler(ServerEvents.PLAYER_JOINED, (payload: unknown) => {
           const data = payload as PlayerJoinedPayload;
@@ -205,16 +223,25 @@ export class OnlineLobbyScene extends Phaser.Scene {
           telegramId: telegram.getContext().userId ?? undefined,
         });
       }
-
-      this.addSocketHandler(ServerEvents.ERROR, (payload: unknown) => {
-        const err = payload as ErrorPayload;
-        console.error('Socket error:', err.message);
-        this.connecting = false;
-      });
     } catch (err) {
-      console.error('Connection failed:', err);
+      this.showValidation('Unable to connect. Please try again.');
       this.connecting = false;
     }
+  }
+
+  private showValidation(message: string): void {
+    if (!this.validationText) return;
+
+    this.validationText.setText(message);
+    this.validationText.setAlpha(1);
+    this.tweens.killTweensOf(this.validationText);
+    this.tweens.add({
+      targets: this.validationText,
+      alpha: 0.75,
+      duration: 450,
+      yoyo: true,
+      repeat: 1,
+    });
   }
 
   private addSocketHandler(event: string, handler: (...args: unknown[]) => void): void {

@@ -178,6 +178,8 @@ export class GridBoard extends Phaser.GameObjects.Container {
 
 export class LetterSelector extends Phaser.GameObjects.Container {
   private onSelect?: (letter: 'S' | 'O') => void;
+  private letterButtons: Array<{ bg: Phaser.GameObjects.Graphics; size: number }> = [];
+  private hoverColor: number = Theme.cyan;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -193,10 +195,15 @@ export class LetterSelector extends Phaser.GameObjects.Container {
     const size = 56;
 
     const bg = this.scene.add.graphics();
-    bg.fillStyle(0x2a2a3a, 1);
-    bg.fillRoundedRect(-size / 2, -size / 2, size, size, 10);
-    bg.lineStyle(2, Theme.white, 0.8);
-    bg.strokeRoundedRect(-size / 2, -size / 2, size, size, 10);
+    const draw = (hover: boolean) => {
+      bg.clear();
+      bg.fillStyle(hover ? this.hoverColor : 0x2a2a3a, hover ? 0.3 : 1);
+      bg.fillRoundedRect(-size / 2, -size / 2, size, size, 10);
+      bg.lineStyle(2, hover ? this.hoverColor : Theme.white, hover ? 1 : 0.8);
+      bg.strokeRoundedRect(-size / 2, -size / 2, size, size, 10);
+    };
+    draw(false);
+    this.letterButtons.push({ bg, size });
 
     const text = this.scene.add.text(0, 0, letter, {
       fontFamily: Theme.fontFamily,
@@ -211,28 +218,36 @@ export class LetterSelector extends Phaser.GameObjects.Container {
     btn.setSize(size, size);
     btn.setInteractive({ useHandCursor: true });
 
-    btn.on('pointerover', () => {
-      bg.clear();
-      bg.fillStyle(Theme.cyan, 0.3);
-      bg.fillRoundedRect(-size / 2, -size / 2, size, size, 10);
-      bg.lineStyle(2, Theme.cyan, 1);
-      bg.strokeRoundedRect(-size / 2, -size / 2, size, size, 10);
-    });
+    btn.on('pointerover', () => draw(true));
+    btn.on('pointerout', () => draw(false));
 
     btn.on('pointerdown', () => {
       this.onSelect?.(letter);
+      this.resetButtons();
       this.setVisible(false);
     });
 
     return btn;
   }
 
+  private resetButtons(): void {
+    this.letterButtons.forEach(({ bg, size }) => {
+      bg.clear();
+      bg.fillStyle(0x2a2a3a, 1);
+      bg.fillRoundedRect(-size / 2, -size / 2, size, size, 10);
+      bg.lineStyle(2, Theme.white, 0.8);
+      bg.strokeRoundedRect(-size / 2, -size / 2, size, size, 10);
+    });
+  }
+
   setSelectHandler(handler: (letter: 'S' | 'O') => void): void {
     this.onSelect = handler;
   }
 
-  showAt(x: number, y: number): void {
+  showAt(x: number, y: number, hoverColor: number = Theme.cyan): void {
     this.setPosition(x, y);
+    this.hoverColor = hoverColor;
+    this.resetButtons();
     this.setVisible(true);
   }
 
