@@ -322,7 +322,7 @@ export interface GameSessionData {
   room?: import('@shared/events').RoomState;
   gameState?: import('@shared/events').GameState;
   isHost?: boolean;
-  localPlayers?: Array<{ id: string; name: string; color: string }>;
+  localPlayers?: Array<{ id: string; name: string; color: string; status?: 'ACTIVE' | 'QUIT' }>;
 }
 
 export const gameData: GameSessionData = {

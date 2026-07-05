@@ -175,6 +175,8 @@ export class SocketManager {
     const scores: Record<string, number> = {};
     room.players.forEach(p => {
       scores[p.id] = 0;
+      p.status = 'ACTIVE';
+      p.isConnected = true;
       p.isReady = true;
     });
 
@@ -213,7 +215,11 @@ export class SocketManager {
       // Initialize game state
       const board = createBoard(room.gridSize);
       const scores: Record<string, number> = {};
-      room.players.forEach(p => { scores[p.id] = 0; });
+      room.players.forEach(p => {
+        scores[p.id] = 0;
+        p.status = 'ACTIVE';
+        p.isConnected = true;
+      });
 
       const gameState: GameState = {
         roomCode: data.roomCode,
@@ -250,6 +256,9 @@ export class SocketManager {
 
       const gameState = await this.redis.getGameState(data.roomCode);
       if (!gameState) throw new Error('Game not found');
+      if (!this.isPlayerActive(gameState.players.find(p => p.id === playerId))) {
+        throw new Error('Player is not active');
+      }
 
       // Validate turn
       if (gameState.currentPlayerId !== playerId) {
@@ -307,10 +316,10 @@ export class SocketManager {
 
       // Determine next turn
       if (!result.bonusTurn) {
-        // Move to next player
-        const currentIndex = gameState.players.findIndex(p => p.id === playerId);
-        const nextIndex = (currentIndex + 1) % gameState.players.length;
-        gameState.currentPlayerId = gameState.players[nextIndex].id;
+        gameState.currentPlayerId = this.getNextActivePlayerId(gameState, playerId);
+        gameState.turnNumber++;
+      } else if (!this.isPlayerActive(gameState.players.find(p => p.id === gameState.currentPlayerId))) {
+        gameState.currentPlayerId = this.getNextActivePlayerId(gameState, playerId);
         gameState.turnNumber++;
       }
       // If bonusTurn, same player keeps their turn
@@ -343,15 +352,14 @@ export class SocketManager {
       // Check if game is in progress
       const gameState = await this.redis.getGameState(data.roomCode);
       if (gameState) {
-        // End game if a player leaves mid-game
-        await this.endGame(data.roomCode, gameState, 'player_left');
-      }
+        await this.handlePlayerQuit(data.roomCode, playerId, 'leave');
+      } else {
+        const room = await this.roomManager.leaveRoom(data.roomCode, playerId);
 
-      const room = await this.roomManager.leaveRoom(data.roomCode, playerId);
-
-      if (room) {
-        const payload: PlayerLeftPayload = { playerId, room };
-        this.io.to(data.roomCode).emit(ServerEvents.PLAYER_LEFT, payload);
+        if (room) {
+          const payload: PlayerLeftPayload = { playerId, room };
+          this.io.to(data.roomCode).emit(ServerEvents.PLAYER_LEFT, payload);
+        }
       }
 
       // Cleanup
@@ -446,6 +454,11 @@ export class SocketManager {
       }
 
       console.log(`[Socket] Disconnected: ${socket.id} (player: ${playerId})`);
+
+      const gameState = await this.redis.getGameState(roomCode);
+      if (gameState) {
+        await this.handlePlayerQuit(roomCode, playerId, 'disconnect');
+      }
     } catch (error: any) {
       console.error('[Disconnect] Error:', error.message);
     }
@@ -461,10 +474,7 @@ export class SocketManager {
       if (!gameState) return;
       if (gameState.currentPlayerId !== playerId) return;
 
-      // Auto-pass: move to next player without placing a letter
-      const currentIndex = gameState.players.findIndex(p => p.id === playerId);
-      const nextIndex = (currentIndex + 1) % gameState.players.length;
-      gameState.currentPlayerId = gameState.players[nextIndex].id;
+      gameState.currentPlayerId = this.getNextActivePlayerId(gameState, playerId);
       gameState.turnNumber++;
 
       await this.redis.setGameState(roomCode, gameState);
@@ -487,17 +497,21 @@ export class SocketManager {
   private async endGame(
     roomCode: string,
     gameState: GameState,
-    reason: 'board_full' | 'player_left' | 'timeout'
+    reason: 'board_full' | 'player_left' | 'timeout',
+    forcedWinnerId?: string | null
   ): Promise<void> {
     this.timerManager.cancelTimer(roomCode);
 
-    const { winnerId, isDraw } = getWinner(gameState.scores);
+    const { winnerId, isDraw } = forcedWinnerId !== undefined
+      ? { winnerId: forcedWinnerId, isDraw: forcedWinnerId === null }
+      : getWinner(gameState.scores);
 
     const payload: GameEndedPayload = {
       winnerId,
       scores: gameState.scores,
       reason,
       isDraw,
+      players: gameState.players,
     };
 
     this.io.to(roomCode).emit(ServerEvents.GAME_ENDED, payload);
@@ -506,6 +520,88 @@ export class SocketManager {
     await this.roomManager.setRoomFinished(roomCode);
 
     console.log(`[Game] Ended in ${roomCode}. Winner: ${winnerId || 'DRAW'}`);
+  }
+
+  private isPlayerActive(player?: PlayerInfo): boolean {
+    return !!player && player.status !== 'QUIT' && player.isConnected;
+  }
+
+  private getActivePlayers(gameState: GameState): PlayerInfo[] {
+    return gameState.players.filter(p => this.isPlayerActive(p));
+  }
+
+  private getNextActivePlayerId(gameState: GameState, currentPlayerId: string): string {
+    const activePlayers = this.getActivePlayers(gameState);
+    if (activePlayers.length === 0) return currentPlayerId;
+
+    const startIndex = gameState.players.findIndex(p => p.id === currentPlayerId);
+    for (let offset = 1; offset <= gameState.players.length; offset++) {
+      const candidate = gameState.players[(startIndex + offset + gameState.players.length) % gameState.players.length];
+      if (this.isPlayerActive(candidate)) return candidate.id;
+      console.log(`[Turn] Skipped ${candidate?.id ?? 'unknown'} because player is QUIT/inactive`);
+    }
+
+    return activePlayers[0].id;
+  }
+
+  private syncGamePlayersFromRoom(gameState: GameState, roomPlayers: PlayerInfo[]): void {
+    gameState.players = gameState.players.map(player => {
+      const roomPlayer = roomPlayers.find(p => p.id === player.id);
+      return roomPlayer ? { ...player, ...roomPlayer } : player;
+    });
+  }
+
+  private async handlePlayerQuit(roomCode: string, playerId: string, source: 'leave' | 'disconnect'): Promise<void> {
+    const gameState = await this.redis.getGameState(roomCode);
+    if (!gameState) return;
+
+    const quittingPlayer = gameState.players.find(p => p.id === playerId);
+    if (!quittingPlayer || quittingPlayer.status === 'QUIT') return;
+
+    console.log(`[Quit] Player ${playerId} quit ${roomCode} via ${source}`);
+    const currentPlayerQuit = gameState.currentPlayerId === playerId;
+
+    const room = await this.roomManager.markPlayerQuit(roomCode, playerId);
+    quittingPlayer.status = 'QUIT';
+    quittingPlayer.isConnected = false;
+    quittingPlayer.isReady = false;
+    quittingPlayer.isHost = false;
+    if (room) this.syncGamePlayersFromRoom(gameState, room.players);
+
+    const activePlayers = this.getActivePlayers(gameState);
+    console.log(`[Quit] Active player count in ${roomCode}: ${activePlayers.length}`);
+
+    if (room) {
+      const payload: PlayerLeftPayload = { playerId, room, gameState };
+      this.io.to(roomCode).emit(ServerEvents.PLAYER_LEFT, payload);
+      this.io.to(roomCode).emit(ServerEvents.ROOM_UPDATE, { room });
+    }
+
+    if (activePlayers.length <= 1) {
+      const winnerId = activePlayers[0]?.id ?? null;
+      console.log(`[Quit] Winner chosen due to quit in ${roomCode}: ${winnerId || 'DRAW'}`);
+      await this.redis.setGameState(roomCode, gameState);
+      await this.endGame(roomCode, gameState, 'player_left', winnerId);
+      return;
+    }
+
+    if (currentPlayerQuit || !this.isPlayerActive(gameState.players.find(p => p.id === gameState.currentPlayerId))) {
+      console.log(`[Turn] Current player ${gameState.currentPlayerId} quit; moving turn`);
+      this.timerManager.cancelTimer(roomCode);
+      gameState.currentPlayerId = this.getNextActivePlayerId(gameState, playerId);
+      gameState.turnNumber++;
+      await this.redis.setGameState(roomCode, gameState);
+
+      const turnPayload: TurnChangedPayload = {
+        currentPlayerId: gameState.currentPlayerId,
+        turnNumber: gameState.turnNumber,
+      };
+      this.io.to(roomCode).emit(ServerEvents.TURN_CHANGED, turnPayload);
+      await this.timerManager.startTimer(roomCode, gameState.currentPlayerId);
+      return;
+    }
+
+    await this.redis.setGameState(roomCode, gameState);
   }
 
   private emitError(socket: Socket, code: string, message: string): void {

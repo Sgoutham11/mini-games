@@ -58,6 +58,7 @@ export class RoomManager {
       name: hostName,
       telegramId,
       color: PLAYER_COLORS[0],
+      status: 'ACTIVE',
       isReady: true,
       isConnected: true,
       isHost: true,
@@ -111,6 +112,7 @@ export class RoomManager {
       name: playerName,
       telegramId,
       color: PLAYER_COLORS[colorIndex],
+      status: 'ACTIVE',
       isReady: false,
       isConnected: true,
       isHost: false,
@@ -145,6 +147,33 @@ export class RoomManager {
     if (room.hostId === playerId) {
       room.hostId = room.players[0].id;
       room.players[0].isHost = true;
+    }
+
+    await this.redis.setRoom(roomCode, room);
+    return room;
+  }
+
+  async markPlayerQuit(
+    roomCode: string,
+    playerId: string
+  ): Promise<RoomState | null> {
+    const room = await this.redis.getRoom(roomCode);
+    if (!room) return null;
+
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) return room;
+
+    player.status = 'QUIT';
+    player.isConnected = false;
+    player.isReady = false;
+    player.isHost = false;
+
+    if (room.hostId === playerId) {
+      const nextHost = room.players.find(p => p.status !== 'QUIT' && p.isConnected);
+      if (nextHost) {
+        nextHost.isHost = true;
+        room.hostId = nextHost.id;
+      }
     }
 
     await this.redis.setRoom(roomCode, room);
@@ -218,6 +247,7 @@ export class RoomManager {
     const player = room.players.find(p => p.id === playerId);
     if (player) {
       player.isConnected = false;
+      if (!player.status) player.status = 'ACTIVE';
     }
     await this.redis.setRoom(roomCode, room);
     return room;
@@ -239,6 +269,7 @@ export class RoomManager {
     const player = room.players.find(p => p.id === playerId);
     if (player) {
       player.isConnected = true;
+      if (!player.status) player.status = 'ACTIVE';
     }
     await this.redis.setRoom(roomCode, room);
     return room;

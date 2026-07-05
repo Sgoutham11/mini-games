@@ -51,13 +51,23 @@ export class ResultScene extends Phaser.Scene {
     entries.forEach(([playerId, score], i) => {
       const player = gameData.gameState?.players.find(p => p.id === playerId)
         ?? gameData.localPlayers?.find(p => p.id === playerId);
-      const name = player?.name ?? playerId;
-      const color = player?.color ?? '#ffffff';
+      const isQuit = player?.status === 'QUIT';
+      const name = this.fitText(player?.name ?? playerId, 15);
+      const color = isQuit ? '#888899' : (player?.color ?? '#ffffff');
       const y = 210 + i * 50;
 
-      this.add.text(width / 2 - 80, y, `#${i + 1}  ${name}`, {
+      this.add.text(width / 2 - 80, isQuit ? y - 6 : y, `#${i + 1}  ${name}`, {
         fontFamily: Theme.fontFamily, fontSize: '16px', color,
       }).setOrigin(0, 0.5);
+
+      if (isQuit) {
+        this.add.text(width / 2 - 52, y + 13, 'QUIT', {
+          fontFamily: Theme.fontFamily,
+          fontSize: '10px',
+          color: '#ff4466',
+          fontStyle: 'bold',
+        }).setOrigin(0, 0.5);
+      }
 
       this.add.text(width / 2 + 80, y, `${score} SOS`, {
         fontFamily: Theme.fontFamily, fontSize: '18px', color: '#00e5ff', fontStyle: 'bold',
@@ -82,6 +92,10 @@ export class ResultScene extends Phaser.Scene {
       this.leaveOnlineMatch();
       this.scene.start('MenuScene');
     });
+  }
+
+  private fitText(value: string, maxChars: number): string {
+    return value.length > maxChars ? `${value.slice(0, maxChars - 3)}...` : value;
   }
 
   private leaveOnlineMatch(): void {
