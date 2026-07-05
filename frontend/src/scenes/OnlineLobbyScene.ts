@@ -9,6 +9,7 @@ export class OnlineLobbyScene extends Phaser.Scene {
   private selectedCount = 2;
   private nameInput!: ReturnType<typeof NeonUI.createInput>;
   private roomCodeInput!: ReturnType<typeof NeonUI.createInput>;
+  private nameValidationText?: Phaser.GameObjects.Text;
   private validationText?: Phaser.GameObjects.Text;
   private contentContainer!: Phaser.GameObjects.Container;
   private connecting = false;
@@ -44,6 +45,12 @@ export class OnlineLobbyScene extends Phaser.Scene {
 
     this.nameInput = NeonUI.createInput(this, width / 2, 245, width - 80, 44, 'Player', gameData.playerName);
     this.add.existing(this.nameInput.container);
+    this.nameValidationText = this.add.text(width / 2, 278, '', {
+      fontFamily: Theme.fontFamily,
+      fontSize: '12px',
+      color: '#ff4466',
+    }).setOrigin(0.5);
+    this.nameValidationText.setResolution(window.devicePixelRatio || 2);
 
     if (this.mode === 'create') {
       this.buildCreateUI(width);
@@ -63,22 +70,22 @@ export class OnlineLobbyScene extends Phaser.Scene {
   }
 
   private buildCreateUI(width: number): void {
-    this.add.text(width / 2, 292, 'Players Count', {
+    this.add.text(width / 2, 300, 'Players Count', {
       fontFamily: Theme.fontFamily, fontSize: '14px', color: '#ffffff',
     }).setOrigin(0.5);
 
     [2, 3, 4].forEach((count, i) => {
-      const cx = width / 2 - 120 + i * 120;
-      const card = this.add.container(cx, 348);
-      const w = 90, h = 90;
+      const cx = width / 2 - 96 + i * 96;
+      const card = this.add.container(cx, 354);
+      const w = 76, h = 76;
       const bg = this.add.graphics();
       bg.fillStyle(Theme.bgCell, 1);
       bg.fillRoundedRect(-w / 2, -h / 2, w, h, 10);
       bg.lineStyle(2, count === this.selectedCount ? Theme.green : Theme.grayDark, count === this.selectedCount ? 0.9 : 0.4);
       bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
 
-      const num = this.add.text(0, 10, String(count), {
-        fontFamily: Theme.fontFamily, fontSize: '28px',
+      const num = this.add.text(0, 0, String(count), {
+        fontFamily: Theme.fontFamily, fontSize: '26px',
         color: count === this.selectedCount ? '#2ecc71' : '#ffffff', fontStyle: 'bold',
       }).setOrigin(0.5);
 
@@ -89,7 +96,7 @@ export class OnlineLobbyScene extends Phaser.Scene {
       this.add.existing(card);
     });
 
-    this.add.text(width / 2, 420, 'Grid Size', {
+    this.add.text(width / 2, 438, 'Grid Size', {
       fontFamily: Theme.fontFamily,
       fontSize: '14px',
       color: '#ffffff',
@@ -103,7 +110,7 @@ export class OnlineLobbyScene extends Phaser.Scene {
       const row = Math.floor(index / 3);
 
       const x = width / 2 - 90 + col * 90;
-      const y = 462 + row * 74;
+      const y = 492 + row * 74;
 
       const card = this.add.container(x, y);
 
@@ -166,7 +173,13 @@ export class OnlineLobbyScene extends Phaser.Scene {
     if (this.connecting) return;
     this.connecting = true;
 
-    gameData.playerName = this.nameInput.getValue() || 'Player';
+    const playerName = (this.nameInput.getValue() || 'Player').trim();
+    if (playerName.length > 15) {
+      this.showNameValidation('Player name must be 15 characters or less');
+      this.connecting = false;
+      return;
+    }
+    gameData.playerName = playerName || 'Player';
 
     try {
       await socketService.connect();
@@ -237,6 +250,21 @@ export class OnlineLobbyScene extends Phaser.Scene {
     this.tweens.killTweensOf(this.validationText);
     this.tweens.add({
       targets: this.validationText,
+      alpha: 0.75,
+      duration: 450,
+      yoyo: true,
+      repeat: 1,
+    });
+  }
+
+  private showNameValidation(message: string): void {
+    if (!this.nameValidationText) return;
+
+    this.nameValidationText.setText(message);
+    this.nameValidationText.setAlpha(1);
+    this.tweens.killTweensOf(this.nameValidationText);
+    this.tweens.add({
+      targets: this.nameValidationText,
       alpha: 0.75,
       duration: 450,
       yoyo: true,

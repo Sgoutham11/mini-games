@@ -260,9 +260,11 @@ export class PlayerCard extends Phaser.GameObjects.Container {
   private statusText: Phaser.GameObjects.Text;
   private scoreText: Phaser.GameObjects.Text;
   private indicator: Phaser.GameObjects.Arc;
+  private maxNameWidth: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number, w: number, h: number) {
     super(scene, x, y);
+    this.maxNameWidth = w - 34;
 
     const panel = scene.add.graphics();
     panel.fillStyle(Theme.bgPanel, 0.9);
@@ -281,12 +283,12 @@ export class PlayerCard extends Phaser.GameObjects.Container {
       fontFamily: Theme.fontFamily, fontSize: '10px', color: '#888899',
     });
     this.statusText.setResolution(window.devicePixelRatio || 2);
-    this.scoreText = scene.add.text(w / 2, h - 8, '0', {
-      fontFamily: Theme.fontFamily, fontSize: '24px', color: '#00e5ff', fontStyle: 'bold',
+    this.scoreText = scene.add.text(w / 2, h - 5, '0', {
+      fontFamily: Theme.fontFamily, fontSize: '22px', color: '#00e5ff', fontStyle: 'bold',
     }).setOrigin(0.5, 1);
     this.scoreText.setResolution(window.devicePixelRatio || 2);
 
-    const sosLabel = scene.add.text(w / 2, h - 32, 'SOS', {
+    const sosLabel = scene.add.text(w / 2, h - 38, 'SOS', {
       fontFamily: Theme.fontFamily, fontSize: '9px', color: '#666677',
     }).setOrigin(0.5);
     sosLabel.setResolution(window.devicePixelRatio || 2);
@@ -296,7 +298,7 @@ export class PlayerCard extends Phaser.GameObjects.Container {
   }
 
   update(name: string, score: number, status: string, isActive: boolean, color: string): void {
-    this.nameText.setText(name);
+    this.nameText.setText(this.fitText(name, this.maxNameWidth));
     this.scoreText.setText(String(score));
     this.scoreText.setColor(color);
     this.statusText.setText(status);
@@ -304,5 +306,20 @@ export class PlayerCard extends Phaser.GameObjects.Container {
     if (isActive) {
       this.indicator.setFillStyle(Theme.green);
     }
+  }
+
+  private fitText(value: string, maxWidth: number): string {
+    const ellipsis = '...';
+    const original = value || 'Player';
+    this.nameText.setText(original);
+    if (this.nameText.width <= maxWidth) return original;
+
+    for (let len = original.length - 1; len > 0; len--) {
+      const next = `${original.slice(0, len)}${ellipsis}`;
+      this.nameText.setText(next);
+      if (this.nameText.width <= maxWidth) return next;
+    }
+
+    return ellipsis;
   }
 }

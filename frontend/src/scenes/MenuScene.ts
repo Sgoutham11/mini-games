@@ -36,7 +36,7 @@ export class MenuScene extends Phaser.Scene {
         icon: '👥',
         title: 'Local Multiplayer',
         desc: 'Play with friends on one device',
-        footer: 'Difficulty: Variable',
+        footer: '',
         scene: 'LocalSetupScene',
       },
       {
@@ -44,7 +44,7 @@ export class MenuScene extends Phaser.Scene {
         icon: '🌐',
         title: 'Online Battle',
         desc: 'Play with friends anywhere',
-        footer: 'LIVE  BETA',
+        footer: 'LIVE',
         scene: 'OnlineLobbyScene',
         highlight: true,
       },
