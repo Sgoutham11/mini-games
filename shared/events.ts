@@ -87,6 +87,7 @@ export interface PlayerJoinedPayload {
 export interface PlayerLeftPayload {
   playerId: string;
   room: RoomState;
+  gameState?: GameState;
 }
 
 export interface GameStartedPayload {
@@ -113,6 +114,7 @@ export interface GameEndedPayload {
   scores: Record<string, number>;
   reason: 'board_full' | 'player_left' | 'timeout';
   isDraw: boolean;
+  players?: PlayerInfo[];
 }
 
 export interface PlayerDisconnectedPayload {
@@ -164,6 +166,7 @@ export interface PlayerInfo {
   name: string;
   telegramId?: number;
   color: string;
+  status?: 'ACTIVE' | 'QUIT';
   isReady: boolean;
   isConnected: boolean;
   isHost: boolean;

@@ -4,7 +4,7 @@ import {
   type CreateRoomPayload, type JoinRoomPayload, type MakeMovePayload,
   type RoomCreatedPayload, type PlayerJoinedPayload, type GameStartedPayload,
   type BoardUpdatedPayload, type TurnChangedPayload, type ScoreUpdatedPayload,
-  type GameEndedPayload, type TimerUpdatedPayload, type ErrorPayload,
+  type GameEndedPayload, type TimerUpdatedPayload, type ErrorPayload, type PlayerLeftPayload,
   type RoomState, type GameState,
 } from '@shared/events';
 import { SOCKET_URL } from '../config';
@@ -114,7 +114,7 @@ export const socketService = new SocketService();
 export type {
   RoomCreatedPayload, PlayerJoinedPayload, GameStartedPayload,
   BoardUpdatedPayload, TurnChangedPayload, ScoreUpdatedPayload,
-  GameEndedPayload, TimerUpdatedPayload, ErrorPayload,
+  GameEndedPayload, TimerUpdatedPayload, ErrorPayload, PlayerLeftPayload,
   RoomState, GameState,
 };
 

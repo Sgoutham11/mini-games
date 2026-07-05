@@ -9,7 +9,7 @@ import { getAIMove, getAIMoveDelay } from '../game/AIEngine';
 import {
   socketService, ServerEvents,
   type BoardUpdatedPayload, type TurnChangedPayload,
-  type ScoreUpdatedPayload, type GameEndedPayload, type TimerUpdatedPayload,
+  type ScoreUpdatedPayload, type GameEndedPayload, type TimerUpdatedPayload, type PlayerLeftPayload,
 } from '../sockets/SocketService';
 import { telegram } from '../telegram/TelegramService';
 
@@ -183,6 +183,26 @@ export class GameScene extends Phaser.Scene {
       this.syncOnlineSnapshot(data.turnNumber);
     });
 
+    this.addOnlineHandler(ServerEvents.PLAYER_LEFT, (payload: unknown) => {
+      const data = payload as PlayerLeftPayload;
+      if (data.gameState) {
+        this.localBoard = data.gameState.board;
+        this.localPlayers = data.gameState.players;
+        this.localScores = data.gameState.scores;
+        this.currentPlayerId = data.gameState.currentPlayerId;
+        this.allScoredLines = data.gameState.scoredLines;
+        gameData.room = data.room;
+        this.syncOnlineSnapshot(data.gameState.turnNumber);
+      } else {
+        this.localPlayers = this.localPlayers.map(player =>
+          player.id === data.playerId
+            ? { ...player, status: 'QUIT', isConnected: false, isReady: false }
+            : player
+        );
+      }
+      this.updatePlayerCards();
+    });
+
     this.addOnlineHandler(ServerEvents.TIMER_UPDATED, (payload: unknown) => {
       const data = payload as TimerUpdatedPayload;
       this.timerRemaining = data.remaining;
@@ -193,6 +213,9 @@ export class GameScene extends Phaser.Scene {
 
     this.addOnlineHandler(ServerEvents.GAME_ENDED, (payload: unknown) => {
       const data = payload as GameEndedPayload;
+      if (data.players) {
+        this.localPlayers = data.players;
+      }
       this.goToResult(data.scores, data.winnerId, data.isDraw);
     });
   }
@@ -266,8 +289,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private advanceTurn(): void {
-    const idx = this.localPlayers.findIndex(p => p.id === this.currentPlayerId);
-    this.currentPlayerId = this.localPlayers[(idx + 1) % this.localPlayers.length].id;
+    this.currentPlayerId = this.getNextActivePlayerId(this.currentPlayerId);
     this.updatePlayerCards();
   }
 
@@ -286,6 +308,23 @@ export class GameScene extends Phaser.Scene {
     return this.localPlayers.find(p => p.id === this.currentPlayerId);
   }
 
+  private isPlayerActive(player?: PlayerInfo): boolean {
+    return !!player && player.status !== 'QUIT' && player.isConnected;
+  }
+
+  private getNextActivePlayerId(currentPlayerId: string): string {
+    const activePlayers = this.localPlayers.filter(p => this.isPlayerActive(p));
+    if (activePlayers.length === 0) return currentPlayerId;
+
+    const startIndex = this.localPlayers.findIndex(p => p.id === currentPlayerId);
+    for (let offset = 1; offset <= this.localPlayers.length; offset++) {
+      const candidate = this.localPlayers[(startIndex + offset + this.localPlayers.length) % this.localPlayers.length];
+      if (this.isPlayerActive(candidate)) return candidate.id;
+    }
+
+    return activePlayers[0].id;
+  }
+
   private getCurrentPlayerColor(): number {
     const color = this.getLocalCurrentPlayer()?.color ?? PLAYER_COLORS[0];
     return parseInt(color.replace('#', ''), 16);
@@ -301,10 +340,12 @@ export class GameScene extends Phaser.Scene {
     this.localPlayers.forEach((p, i) => {
       if (!this.playerCards[i]) return;
       const isActive = p.id === this.currentPlayerId;
-      const status = isActive
+      const status = p.status === 'QUIT'
+        ? 'QUIT'
+        : isActive
         ? (p.id === 'ai_bot' && this.aiThinking ? 'THINKING...' : 'YOUR TURN')
         : 'WAITING';
-      this.playerCards[i].update(p.name, this.localScores[p.id] || 0, status, isActive, p.color);
+      this.playerCards[i].update(p.name, this.localScores[p.id] || 0, status, isActive && p.status !== 'QUIT', p.color);
     });
   }
 
