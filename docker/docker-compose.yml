@@ -32,6 +32,13 @@ services:
     restart: unless-stopped
 
   frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL}
+        VITE_LOGGER_URL: ${VITE_LOGGER_URL}
     image: sos-frontend:v1
     ports:
       - "5173:80"
