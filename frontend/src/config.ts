@@ -39,4 +39,4 @@ export const GameConfig = {
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:7071/telegram-bot-buddy';
 export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
-export const LOGGER_URL = import.meta.env.LOGGER_URL || 'http://localhost:7071/telegram-bot-buddy/logs/print';
+export const LOGGER_URL = import.meta.env.VITE_LOGGER_URL || 'http://localhost:7071/telegram-bot-buddy/logs/print';
