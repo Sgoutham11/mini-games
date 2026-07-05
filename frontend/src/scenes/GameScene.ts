@@ -138,7 +138,11 @@ export class GameScene extends Phaser.Scene {
 
       this.pendingCell = { row, col };
       const selectorPosition = this.board.getCellWorldPosition(row, col);
-      this.letterSelector.showAt(selectorPosition.x, selectorPosition.y);
+      this.letterSelector.showAt(
+        this.getSafeLetterSelectorX(selectorPosition.x, width),
+        selectorPosition.y,
+        this.getCurrentPlayerColor()
+      );
     });
 
     // Letter selector (centered on board)
@@ -280,6 +284,17 @@ export class GameScene extends Phaser.Scene {
 
   private getLocalCurrentPlayer(): PlayerInfo | undefined {
     return this.localPlayers.find(p => p.id === this.currentPlayerId);
+  }
+
+  private getCurrentPlayerColor(): number {
+    const color = this.getLocalCurrentPlayer()?.color ?? PLAYER_COLORS[0];
+    return parseInt(color.replace('#', ''), 16);
+  }
+
+  private getSafeLetterSelectorX(x: number, width: number): number {
+    const selectorHalfWidth = 68;
+    const screenPadding = 12;
+    return Phaser.Math.Clamp(x, selectorHalfWidth + screenPadding, width - selectorHalfWidth - screenPadding);
   }
 
   private updatePlayerCards(): void {

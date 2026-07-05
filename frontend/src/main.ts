@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GameConfig } from './config';
 import { telegram } from './telegram/TelegramService';
 import { BootScene } from './scenes/BootScene';
+import { GameSelectionScene } from './scenes/GameSelectionScene';
 import { MenuScene } from './scenes/MenuScene';
 import { SinglePlayerSetupScene } from './scenes/SinglePlayerSetupScene';
 import { LocalSetupScene } from './scenes/LocalSetupScene';
@@ -23,6 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   scene: [
     BootScene,
+    GameSelectionScene,
     MenuScene,
     SinglePlayerSetupScene,
     LocalSetupScene,
