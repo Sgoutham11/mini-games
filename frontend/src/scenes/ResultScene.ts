@@ -120,7 +120,7 @@ export class ResultScene extends Phaser.Scene {
   ): Promise<void> {
 
     try {
-
+       LoggerService.debugLog("Inside save score function", `${API_BASE}/api/game/score`);
       const myScore = scores[gameData.playerId] ?? 0;
 
       const opponentScore = Object.entries(scores)
@@ -129,6 +129,7 @@ export class ResultScene extends Phaser.Scene {
 
       LoggerService.debugLog("Saving score...");
       LoggerService.debugLog("API_BASE", API_BASE);
+      LoggerService.debugLog(":", gameData.playerName);
 
       const response = await fetch(`${API_BASE}/api/game/score`, {
         method: "POST",
