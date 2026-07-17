@@ -9,6 +9,7 @@ import { Server as SocketServer } from 'socket.io';
 import cors from 'cors';
 import { RedisService } from './redis/RedisService';
 import { SocketManager } from './socket/SocketManager';
+import { BingoSocketManager } from './bingo/BingoSocketManager';
 import { createAuthMiddleware } from './middleware/AuthMiddleware';
 import { LoggerService } from './logger/LoggerService';
 
@@ -80,7 +81,9 @@ async function main() {
   // ─── Socket Manager ───────────────────────────
   const socketManager = new SocketManager(io, redis);
   socketManager.initialize();
-  console.log('[Socket] Manager initialized');
+  const bingoSocketManager = new BingoSocketManager(io, redis);
+  bingoSocketManager.initialize();
+  console.log('[Socket] Managers initialized');
 
   // ─── Start Server ─────────────────────────────
   server.listen(PORT, () => {

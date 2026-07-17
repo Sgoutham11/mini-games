@@ -104,7 +104,7 @@ export class MenuScene extends Phaser.Scene {
 
     container.add([bg, iconBg, icon, title, desc, footer]);
     container.setSize(w, h);
-    container.setInteractive({ useHandCursor: true });
+    NeonUI.addHitZone(this, container, w, h);
 
     container.on('pointerover', () => {
       bg.clear();

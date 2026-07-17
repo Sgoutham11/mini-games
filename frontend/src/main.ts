@@ -3,6 +3,11 @@ import { GameConfig } from './config';
 import { telegram } from './telegram/TelegramService';
 import { BootScene } from './scenes/BootScene';
 import { GameSelectionScene } from './scenes/GameSelectionScene';
+import { BingoMenuScene } from './scenes/BingoMenuScene';
+import { BingoOnlineLobbyScene } from './scenes/BingoOnlineLobbyScene';
+import { BingoWaitingRoomScene } from './scenes/BingoWaitingRoomScene';
+import { BingoGameScene } from './scenes/BingoGameScene';
+import { BingoResultScene } from './scenes/BingoResultScene';
 import { MenuScene } from './scenes/MenuScene';
 import { SinglePlayerSetupScene } from './scenes/SinglePlayerSetupScene';
 import { LocalSetupScene } from './scenes/LocalSetupScene';
@@ -25,6 +30,11 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [
     BootScene,
     GameSelectionScene,
+    BingoMenuScene,
+    BingoOnlineLobbyScene,
+    BingoWaitingRoomScene,
+    BingoGameScene,
+    BingoResultScene,
     MenuScene,
     SinglePlayerSetupScene,
     LocalSetupScene,
