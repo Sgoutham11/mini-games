@@ -427,6 +427,7 @@ export class SocketManager {
     try {
       const mapping = await this.redis.getSocketMapping(socket.id);
       if (!mapping) return;
+      if (mapping.gameKind === 'bingo') return;
 
       const { playerId, roomCode } = mapping;
 

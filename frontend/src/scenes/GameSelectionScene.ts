@@ -24,6 +24,14 @@ export class GameSelectionScene extends Phaser.Scene {
         scene: 'MenuScene',
         highlight: true,
       },
+      {
+        icon: 'B',
+        title: 'Bingo',
+        desc: 'Turn-based number strategy',
+        footer: 'New game',
+        scene: 'BingoMenuScene',
+        highlight: true,
+      },
     ];
 
     const cardW = width - 48;
@@ -81,7 +89,7 @@ export class GameSelectionScene extends Phaser.Scene {
 
     container.add([bg, iconBg, icon, title, desc, footer]);
     container.setSize(w, h);
-    container.setInteractive({ useHandCursor: true });
+    NeonUI.addHitZone(this, container, w, h);
 
     container.on('pointerover', () => {
       bg.clear();

@@ -4,6 +4,7 @@
 
 import { createClient, RedisClientType } from 'redis';
 import { RoomState, GameState } from '../../../shared/events';
+import { BingoGameState, BingoRoomState } from '../../../shared/bingo-events';
 import { ROOM_TTL_SECONDS, RECONNECT_WINDOW_MS } from '../../../shared/enums';
 
 export class RedisService {
@@ -42,6 +43,23 @@ export class RedisService {
     );
   }
 
+  async setBingoRoom(roomCode: string, room: BingoRoomState): Promise<void> {
+    await this.client.setEx(
+      `bingo:room:${roomCode}`,
+      ROOM_TTL_SECONDS,
+      JSON.stringify(room)
+    );
+  }
+
+  async getBingoRoom(roomCode: string): Promise<BingoRoomState | null> {
+    const data = await this.client.get(`bingo:room:${roomCode}`);
+    return data ? JSON.parse(data) : null;
+  }
+
+  async deleteBingoRoom(roomCode: string): Promise<void> {
+    await this.client.del(`bingo:room:${roomCode}`);
+  }
+
   async getRoom(roomCode: string): Promise<RoomState | null> {
     const data = await this.client.get(`room:${roomCode}`);
     return data ? JSON.parse(data) : null;
@@ -67,6 +85,23 @@ export class RedisService {
     );
   }
 
+  async setBingoGameState(roomCode: string, gameState: BingoGameState): Promise<void> {
+    await this.client.setEx(
+      `bingo:game:${roomCode}`,
+      ROOM_TTL_SECONDS,
+      JSON.stringify(gameState)
+    );
+  }
+
+  async getBingoGameState(roomCode: string): Promise<BingoGameState | null> {
+    const data = await this.client.get(`bingo:game:${roomCode}`);
+    return data ? JSON.parse(data) : null;
+  }
+
+  async deleteBingoGameState(roomCode: string): Promise<void> {
+    await this.client.del(`bingo:game:${roomCode}`);
+  }
+
   async getGameState(roomCode: string): Promise<GameState | null> {
     const data = await this.client.get(`game:${roomCode}`);
     return data ? JSON.parse(data) : null;
@@ -82,7 +117,7 @@ export class RedisService {
 
   async setPlayerPresence(
     playerId: string,
-    data: { roomCode: string; socketId: string; lastSeen: number }
+    data: { roomCode: string; socketId: string; lastSeen: number; gameKind?: 'sos' | 'bingo' }
   ): Promise<void> {
     const ttlSeconds = Math.ceil(RECONNECT_WINDOW_MS / 1000);
     await this.client.setEx(
@@ -94,7 +129,7 @@ export class RedisService {
 
   async getPlayerPresence(
     playerId: string
-  ): Promise<{ roomCode: string; socketId: string; lastSeen: number } | null> {
+  ): Promise<{ roomCode: string; socketId: string; lastSeen: number; gameKind?: 'sos' | 'bingo' } | null> {
     const data = await this.client.get(`presence:${playerId}`);
     return data ? JSON.parse(data) : null;
   }
@@ -105,7 +140,7 @@ export class RedisService {
 
   async setPlayerSocketMapping(
     playerId: string,
-    data: { socketId: string; roomCode: string }
+    data: { socketId: string; roomCode: string; gameKind?: 'sos' | 'bingo' }
   ): Promise<void> {
     await this.client.setEx(
       `socket:${playerId}`,
@@ -116,7 +151,7 @@ export class RedisService {
 
   async getPlayerSocketMapping(
     playerId: string
-  ): Promise<{ socketId: string; roomCode: string } | null> {
+  ): Promise<{ socketId: string; roomCode: string; gameKind?: 'sos' | 'bingo' } | null> {
     const data = await this.client.get(`socket:${playerId}`);
     return data ? JSON.parse(data) : null;
   }
@@ -131,7 +166,7 @@ export class RedisService {
 
   async setSocketMapping(
     socketId: string,
-    data: { playerId: string; roomCode: string }
+    data: { playerId: string; roomCode: string; gameKind?: 'sos' | 'bingo' }
   ): Promise<void> {
     await this.client.setEx(
       `socket:${socketId}`,
@@ -142,7 +177,7 @@ export class RedisService {
 
   async getSocketMapping(
     socketId: string
-  ): Promise<{ playerId: string; roomCode: string } | null> {
+  ): Promise<{ playerId: string; roomCode: string; gameKind?: 'sos' | 'bingo' } | null> {
     const data = await this.client.get(`socket:${socketId}`);
     return data ? JSON.parse(data) : null;
   }

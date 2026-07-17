@@ -138,6 +138,7 @@ export class ResultScene extends Phaser.Scene {
           Authorization: `Bearer ${telegram.getInitData()}`,
         },
         body: JSON.stringify({
+          gameCode: 'SOS',
           playerName: gameData.playerName,
           score: myScore,
           opponentScore,
@@ -186,6 +187,7 @@ export class ResultScene extends Phaser.Scene {
   //         Authorization: `Bearer ${telegram.getInitData()}`,
   //       },
   //       body: JSON.stringify({
+  //         gameCode: 'SOS',
   //         playerName: gameData.playerName,
   //         score: myScore,
   //         opponentScore,

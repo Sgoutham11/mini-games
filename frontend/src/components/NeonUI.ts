@@ -3,6 +3,21 @@ import { Theme } from '../config';
 
 /** Shared neon UI drawing utilities */
 export class NeonUI {
+  static addHitZone(
+    scene: Phaser.Scene,
+    container: Phaser.GameObjects.Container,
+    w: number,
+    h: number
+  ): Phaser.GameObjects.Zone {
+    const zone = scene.add.zone(0, 0, w + 24, h + 20).setOrigin(0.5);
+    zone.setInteractive({ useHandCursor: true });
+    container.add(zone);
+    ['pointerdown', 'pointerup', 'pointerover', 'pointerout'].forEach(event => {
+      zone.on(event, (...args: unknown[]) => container.emit(event, ...args));
+    });
+    return zone;
+  }
+
   static drawPanel(
     scene: Phaser.Scene, x: number, y: number, w: number, h: number,
     opts: { glowColor?: number; fillColor?: number; borderWidth?: number } = {}
@@ -62,7 +77,7 @@ export class NeonUI {
 
     container.add([bg, text]);
     container.setSize(w, h);
-    container.setInteractive({ useHandCursor: true });
+    NeonUI.addHitZone(scene, container, w, h);
 
     container.on('pointerover', () => draw(true));
     container.on('pointerout', () => draw(false));
@@ -93,7 +108,7 @@ export class NeonUI {
 
     container.add([bg, text]);
     container.setSize(w, h);
-    container.setInteractive({ useHandCursor: true });
+    NeonUI.addHitZone(scene, container, w, h);
     container.on('pointerover', () => draw(true));
     container.on('pointerout', () => draw(false));
 
@@ -175,7 +190,7 @@ export class NeonUI {
 
     container.add([bg, display]);
     container.setSize(w, h);
-    container.setInteractive({ useHandCursor: true });
+    NeonUI.addHitZone(scene, container, w, h);
 
     const syncInputBounds = () => {
       const canvas = scene.scale.canvas;
@@ -303,7 +318,7 @@ export class NeonUI {
       container.add([bg, glyph]);
     }
     container.setSize(size, size);
-    container.setInteractive({ useHandCursor: true });
+    NeonUI.addHitZone(scene, container, size, size);
     container.on('pointerover', () => draw(true));
     container.on('pointerout', () => draw(false));
     return container;
@@ -313,6 +328,7 @@ export class NeonUI {
 /** Global game session data passed between scenes */
 export interface GameSessionData {
   mode: 'single' | 'local' | 'online';
+  selectedGame?: 'sos' | 'bingo';
   gridSize: number;
   playerCount: number;
   playerName: string;
@@ -323,6 +339,8 @@ export interface GameSessionData {
   gameState?: import('@shared/events').GameState;
   isHost?: boolean;
   localPlayers?: Array<{ id: string; name: string; color: string; status?: 'ACTIVE' | 'QUIT' }>;
+  bingoRoom?: import('@shared/bingo-events').BingoRoomState;
+  bingoGameState?: import('@shared/bingo-events').BingoGameState;
 }
 
 export const gameData: GameSessionData = {

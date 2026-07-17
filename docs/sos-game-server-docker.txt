@@ -1,0 +1,15 @@
+FROM node:20.20.2-alpine
+WORKDIR /app
+COPY game-server/package*.json ./
+RUN npm ci
+COPY game-server/ ./
+COPY shared/ ../shared/
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV TELEGRAM_BOT_TOKEN=8744478553:AAFbitwykF3qmjcYAtrY7oc67pVw9Hj4Wgs
+ENV REDIS_URL=redis://redis:6379
+ENV SPRING_BOOT_URL=http://68.233.103.2:7071/telegram-bot-buddy
+ENV LOGGER_URL=http://68.233.103.2:7071/telegram-bot-buddy/logs/print
+ENV CORS_ORIGINS=https://playbuddy.zapto.org
+EXPOSE 3001
+CMD ["npx", "tsx", "src/index.ts"]
