@@ -149,9 +149,9 @@ export class BingoGameScene extends Phaser.Scene {
     });
 
     const board = me ? this.gameState.boards[me.id] : undefined;
-    if (board) {
-      const canPlay = me?.id === this.gameState.currentPlayerId && me.status === 'PLAYING';
-      const ownerColor = parseInt((me?.color ?? '#00e5ff').replace('#', ''), 16);
+    if (me && board) {
+      const canPlay = me.id === this.gameState.currentPlayerId && me.status === 'PLAYING';
+      const ownerColor = parseInt(me.color.replace('#', ''), 16);
       this.ownProgressText.setText(`Your Board  ${this.progress(me)}  ${me.score}/${this.gameState.pointsToWin}`);
       this.ownProgressText.setColor(me.color);
       this.board.updateBoard(board, this.gameState.selectedNumbers, canPlay, ownerColor);

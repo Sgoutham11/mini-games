@@ -3,8 +3,12 @@ import { GameMode } from '@shared/enums';
 import { Theme } from '../config';
 import { NeonUI, gameData } from '../components/NeonUI';
 import { telegram } from '../telegram/TelegramService';
+import { LeaderboardStrip } from '../components/LeaderboardWidgets';
+import { LeaderboardService } from '../services/LeaderboardService';
 
 export class MenuScene extends Phaser.Scene {
+  private leaderboardAbort?: AbortController;
+
   constructor() {
     super({ key: 'MenuScene' });
   }
@@ -66,6 +70,33 @@ export class MenuScene extends Phaser.Scene {
         this.scene.start(mode.scene);
       });
     });
+
+    const leaderboard = new LeaderboardStrip(
+      this,
+      width / 2,
+      height - 194,
+      width - 48,
+      104,
+      'Top SOS Players',
+      'SOS',
+      true
+    );
+    leaderboard.setLoading();
+    this.loadLeaderboard(leaderboard);
+    this.events.once('shutdown', () => this.leaderboardAbort?.abort());
+  }
+
+  private async loadLeaderboard(leaderboard: LeaderboardStrip): Promise<void> {
+    this.leaderboardAbort = new AbortController();
+    try {
+      const players = await LeaderboardService.getLeaderboard('SOS', 10, this.leaderboardAbort.signal);
+      if (!this.sys.settings.active) return;
+      leaderboard.setPlayers(players, 'No completed SOS games yet');
+    } catch (error) {
+      if (this.leaderboardAbort.signal.aborted) return;
+      console.error('[MenuScene] Failed to load SOS leaderboard', error);
+      leaderboard.setError();
+    }
   }
 
   private createModeCard(

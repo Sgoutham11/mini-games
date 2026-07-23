@@ -2,8 +2,14 @@ import Phaser from 'phaser';
 import { Theme } from '../config';
 import { NeonUI } from '../components/NeonUI';
 import { telegram } from '../telegram/TelegramService';
+import { createBestPlayerCard } from '../components/LeaderboardWidgets';
+import { LeaderboardService, type BestPlayersByGame } from '../services/LeaderboardService';
 
 export class GameSelectionScene extends Phaser.Scene {
+  private leaderboardAbort?: AbortController;
+  private bestPlayerCards: Phaser.GameObjects.Container[] = [];
+  private bestPlayersTitle?: Phaser.GameObjects.Text;
+
   constructor() {
     super({ key: 'GameSelectionScene' });
   }
@@ -46,6 +52,47 @@ export class GameSelectionScene extends Phaser.Scene {
         this.scene.start(game.scene);
       });
     });
+
+    this.renderBestPlayers('loading');
+    this.loadBestPlayers();
+    this.events.once('shutdown', () => this.leaderboardAbort?.abort());
+  }
+
+  private async loadBestPlayers(): Promise<void> {
+    this.leaderboardAbort = new AbortController();
+    try {
+      const bestPlayers = await LeaderboardService.getBestPlayersByGame(this.leaderboardAbort.signal);
+      if (!this.sys.settings.active) return;
+      this.renderBestPlayers('ready', bestPlayers);
+    } catch (error) {
+      if (this.leaderboardAbort.signal.aborted) return;
+      console.error('[GameSelection] Failed to load best players', error);
+      this.renderBestPlayers('error');
+    }
+  }
+
+  private renderBestPlayers(
+    state: 'loading' | 'ready' | 'empty' | 'error',
+    bestPlayers: BestPlayersByGame = {}
+  ): void {
+    const { width } = this.scale;
+    this.bestPlayerCards.forEach(card => card.destroy());
+    this.bestPlayerCards = [];
+
+    if (!this.bestPlayersTitle) {
+      this.bestPlayersTitle = NeonUI.createSubtitle(this, width / 2, 428, 'Best Players');
+    }
+
+    const cardW = (width - 64) / 2;
+    const sos = bestPlayers.SOS ?? null;
+    const bingo = bestPlayers.BINGO ?? null;
+    const sosState = state === 'ready' && !sos ? 'empty' : state;
+    const bingoState = state === 'ready' && !bingo ? 'empty' : state;
+
+    this.bestPlayerCards.push(
+      createBestPlayerCard(this, 24 + cardW / 2, 486, cardW, 88, 'SOS Champion', sos, sosState, Theme.cyan),
+      createBestPlayerCard(this, width - 24 - cardW / 2, 486, cardW, 88, 'Bingo Champion', bingo, bingoState, Theme.green)
+    );
   }
 
   private createGameCard(
