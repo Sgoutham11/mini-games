@@ -3,8 +3,12 @@ import { Theme } from '../config';
 import { NeonUI, gameData } from '../components/NeonUI';
 import { telegram } from '../telegram/TelegramService';
 import { socketService } from '../sockets/SocketService';
+import { LeaderboardStrip } from '../components/LeaderboardWidgets';
+import { LeaderboardService } from '../services/LeaderboardService';
 
 export class BingoMenuScene extends Phaser.Scene {
+  private leaderboardAbort?: AbortController;
+
   constructor() {
     super({ key: 'BingoMenuScene' });
   }
@@ -54,15 +58,42 @@ export class BingoMenuScene extends Phaser.Scene {
       const card = this.createModeCard(width / 2, 160 + i * 126, cardW, cardH, mode);
       card.on('pointerdown', () => {
         telegram.haptic('light');
-        if (mode.scene) this.scene.start(mode.scene);
+      if (mode.scene) this.scene.start(mode.scene);
       });
     });
+
+    const leaderboard = new LeaderboardStrip(
+      this,
+      width / 2,
+      318,
+      width - 48,
+      104,
+      'Top Bingo Players',
+      'BINGO',
+      true
+    );
+    leaderboard.setLoading();
+    this.loadLeaderboard(leaderboard);
+    this.events.once('shutdown', () => this.leaderboardAbort?.abort());
 
     const backBtn = NeonUI.createButton(this, 84, height - 54, 120, 44, 'Back');
     backBtn.on('pointerdown', () => {
       telegram.haptic('light');
       this.scene.start('GameSelectionScene');
     });
+  }
+
+  private async loadLeaderboard(leaderboard: LeaderboardStrip): Promise<void> {
+    this.leaderboardAbort = new AbortController();
+    try {
+      const players = await LeaderboardService.getLeaderboard('BINGO', 10, this.leaderboardAbort.signal);
+      if (!this.sys.settings.active) return;
+      leaderboard.setPlayers(players, 'No completed Bingo games yet');
+    } catch (error) {
+      if (this.leaderboardAbort.signal.aborted) return;
+      console.error('[BingoMenuScene] Failed to load Bingo leaderboard', error);
+      leaderboard.setError();
+    }
   }
 
   private createModeCard(
